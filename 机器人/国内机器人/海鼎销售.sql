@@ -1,0 +1,1 @@
+select * from dw.dws_hd_wholesale_item_detail as hd left join sds.store as s on hd.store_id = s.gid where s.qd = '机器人' 
