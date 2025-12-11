@@ -129,17 +129,16 @@ WITH date_ref AS (
     DATE_ADD('${trans_date}', INTERVAL -1 MONTH) AS last_month_end,
     DATE_FORMAT(DATE_ADD('${trans_date}', INTERVAL -12 MONTH), '%Y-%m-01') AS last_year_month_start,
     DATE_ADD('${trans_date}', INTERVAL -12 MONTH) AS last_year_month_end
-)
-
-
+),
+base_sales as (
 select 
   Region,
   Subsidiary,
   cus_2nd_cat_name,
-  sum(Month_CNY_MTD),
-  sum(amt_last_month),
-  sum(amt_last_year),
-  sum(month_bgt_amt)
+  sum(Month_CNY_MTD) as Month_CNY_MTD,
+  sum(amt_last_month) as amt_last_month,
+  sum(amt_last_year) as amt_last_year,
+  sum(month_bgt_amt) as month_bgt_amt
 from 
 (SELECT
   -- s.trans_date,
@@ -235,3 +234,29 @@ group by
   Region,
   Subsidiary,
   cus_2nd_cat_name
+)
+
+
+
+SELECT
+  DAY('${trans_date}') / DAY(LAST_DAY('${trans_date}')) AS Month_Progress,
+  Region,
+  Subsidiary,
+  cus_2nd_cat_name,
+  Month_CNY_MTD,
+  month_bgt_amt as Month_Target,
+  ifnull(Month_CNY_MTD/month_bgt_amt,0) as Month_Target_Reach,
+  amt_last_month,
+  amt_last_year,
+  -- 环比 MoM
+  CASE WHEN amt_last_month != 0 THEN ROUND((Month_CNY_MTD - amt_last_month) / amt_last_month, 4) ELSE NULL END AS MOM,
+  -- 同比 YoY
+  CASE WHEN amt_last_year != 0 THEN ROUND((Month_CNY_MTD - amt_last_year) / amt_last_year, 4) ELSE NULL END AS YOY
+FROM base_sales
+where 1=1 ${if(Subsidiary == '',"","and   Subsidiary in ('" + Subsidiary + "')")} 
+and 1=1 ${if(Region == '',"","and   Region in ('" + Region + "')")} 
+and 1=1 ${if(cus_2nd_cat_name == '',"","and   cus_2nd_cat_name in ('" + cus_2nd_cat_name + "')")} 
+
+
+
+select * from po.purchase_order_info
