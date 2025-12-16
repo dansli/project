@@ -685,7 +685,60 @@ group by
 ------------------------------------------------------
 -- 修改逻辑
 -- 部分发货没发货部分只展示合同 10.28
+
+
+
 select 
+  Location,
+  HDcode,
+  barcode,
+  sku_name,
+  sku_name_en,
+  series_code,
+  series_name,
+  series_name_en,
+  launch_date,
+  retail_price,
+  box_spec,
+  case_spec,
+  cus_code,
+  cus_name,
+  customer_type,
+  channel_id,
+  channel_name,
+  country,
+  currency,
+  order_no,
+  order_state,
+  order_date,
+  order_QTY,
+  order_value,
+  invoice_no,
+  contract_price,
+  created_time,
+  contract_payment_remarks,
+  invoice_state,
+  external_order_no,
+  contract_QTY,
+  Pending_Shipment_Qty,
+  delivery_order_no,
+  delivery_order_state,
+  partner_delivery_order_no,
+  shipping_time,
+  transportation_method,
+  ETD,
+  ETA,
+  ATD,
+  ATA,
+  delivery_time,
+  NS_Receiving_Time,
+  del_Shipped_amount,
+  del_Shipped_QTY,
+  Undelivered_Qty,
+  Unreceived_Qty,
+  onway_qty,
+  Transit_Status
+from (select 
   t1.Location,
   t1.HDcode,
   g.sku_barcode as barcode,
@@ -703,6 +756,12 @@ select
   cus.cus_2nd_cat_name as customer_type,
   t1.channel_id,
   channel.channel_name_cn as channel_name,
+  dms_channel.ch_c1_code as CH_Class1_code,
+  dms_channel.ch_c1_name as CH_Class1,
+  dms_channel.ch_c2_code as CH_Class2_code,
+  dms_channel.ch_c2_name as CH_Class2,
+  dms_channel.ch_c3_code as CH_Class3_code,
+  dms_channel.ch_c3_name as CH_Class3,  
   channel.cus_country_cn as country,
   t1.currency,
   t1.order_no,
@@ -735,12 +794,23 @@ select
   d.ata as ATA,
   d.in_storage_time as delivery_time,
   -- max(d.in_storage_time) as delivery_time,
-  max(ir.NS_Receiving_Time) as NS_Receiving_Time,
+  max(ir.latest_to_date) as NS_Receiving_Time,
 --   ir.NS_Receiving_Time as NS_Receiving_Time,
   sum(t1.del_Shipped_amount) as del_Shipped_amount,
   sum(t1.del_Shipped_QTY) as del_Shipped_QTY,
   sum(t1.Undelivered_Qty) as Undelivered_Qty,
-  SUM(CASE WHEN cus.cus_2nd_cat_name = 'Corp' THEN t1.Unreceived_Qty ELSE 0 END) AS Unreceived_Qty
+  sum(case when cus.cus_2nd_cat_name = 'Corp' 
+         then coalesce(Unreceived_Qty, 0) 
+         else 0 
+    end) as Unreceived_Qty,
+  sum(t1.order_QTY)+ sum(t1.Orders_QTY_partly_shipped) - sum(t1.Shipped_QTY) + sum(case when cus.cus_2nd_cat_name = 'Corp' 
+         then coalesce(Unreceived_Qty, 0) 
+         else 0 
+    end) as onway_qty,
+  case when sum(t1.order_QTY)+ sum(t1.Orders_QTY_partly_shipped) - sum(t1.Shipped_QTY) + sum(case when cus.cus_2nd_cat_name = 'Corp' 
+         then coalesce(Unreceived_Qty, 0) 
+         else 0 
+    end)>0 then 'yes' else 'no' end as Transit_Status
 
   -- case when cus.cus_2nd_cat_name ='Corp' then sum(Unreceived_Qty) else 0 end as Unreceived_Qty
 from (
@@ -806,10 +876,10 @@ SELECT
   0 as order_value, -- 审核中商品金额
   sum(ord_detail.total_price) as contract_price,
   sum(ord_detail.total_count) as contract_QTY,-- -- 合同未付款、已付款、部分发货数量
-  sum(IF(c.contract_state = 3, ord_detail.total_count, 0)) as Orders_QTY_partly_shipped,  -- 部分发货数量
+  sum(IF(c.contract_state in ('1','2','3'), ord_detail.total_count, 0)) as Orders_QTY_partly_shipped,  -- 部分发货数量
   0 as del_Shipped_amount,
   0 as del_Shipped_QTY,
-  sum(IF(c.contract_state = 3, del_detail.quantity, 0)) as Shipped_QTY,
+  COALESCE(sum(IF(c.contract_state in ('1','2','3'), del_detail.quantity, 0)), 0) AS Shipped_QTY,
   0 as Undelivered_Qty,
   0 as Unreceived_Qty
 FROM
@@ -867,50 +937,50 @@ union all
 
 -- 已发货、已完成状态的合同展示合同信息和发货单信息
 
-SELECT
-  o.store_code as Location,
-  ord_detail.hd_code as HDcode,
-  o.customer_code as cus_code,
-  o.channel_code as channel_id,
-  c.trade_currency as currency,
-  null as order_no,
-  null as order_state,
-  cast(null as timestamp) as order_date,
-  c.invoice_no as invoice_no,
-  c.freight_desc as contract_payment_remarks,
-  c.contract_state as invoice_state,
-  c.hd_order_no as external_order_no,
-  d.delivery_order_no as delivery_order_no,
-  d.partner_delivery_order_no as partner_delivery_order_no,
-  d.transport_type as transportation_method,
-  0 as order_QTY, -- 审核中数量
-  0 as order_value, -- 审核中商品金额
-  sum(ord_detail.total_price) as contract_price,
-  sum(ord_detail.total_count) as contract_QTY,-- -- 合同未付款、已付款、部分发货数量
-  0 as Orders_QTY_partly_shipped,  -- 部分发货数量
-  0 as del_Shipped_amount,
-  0 as del_Shipped_QTY,
-  0 as Shipped_QTY,
-  0 as Undelivered_Qty,
-  0 as Unreceived_Qty
-FROM
-  dms.order_detail as ord_detail
-inner join dms.`order` as o on ord_detail.order_no = o.order_no
-left join dms.contract as c on c.invoice_no = o.invoice_no
-left join dms.delivery_order as d on c.invoice_no = d.invoice_no
-where ord_detail.state = 1 and c.contract_state in ('4','5')
-group by 
-  o.store_code,
-  ord_detail.hd_code,
-  o.customer_code,
-  o.channel_code,
-  c.trade_currency,
-  c.invoice_no,
-  c.freight_desc,
-  c.contract_state,
-  c.hd_order_no
+-- SELECT
+--   o.store_code as Location,
+--   ord_detail.hd_code as HDcode,
+--   o.customer_code as cus_code,
+--   o.channel_code as channel_id,
+--   c.trade_currency as currency,
+--   null as order_no,
+--   null as order_state,
+--   cast(null as timestamp) as order_date,
+--   c.invoice_no as invoice_no,
+--   c.freight_desc as contract_payment_remarks,
+--   c.contract_state as invoice_state,
+--   c.hd_order_no as external_order_no,
+--   d.delivery_order_no as delivery_order_no,
+--   d.partner_delivery_order_no as partner_delivery_order_no,
+--   d.transport_type as transportation_method,
+--   0 as order_QTY, -- 审核中数量
+--   0 as order_value, -- 审核中商品金额
+--   sum(ord_detail.total_price) as contract_price,
+--   sum(ord_detail.total_count) as contract_QTY,-- -- 合同未付款、已付款、部分发货数量
+--   0 as Orders_QTY_partly_shipped,  -- 部分发货数量
+--   0 as del_Shipped_amount,
+--   0 as del_Shipped_QTY,
+--   0 as Shipped_QTY,
+--   0 as Undelivered_Qty,
+--   0 as Unreceived_Qty
+-- FROM
+--   dms.order_detail as ord_detail
+-- inner join dms.`order` as o on ord_detail.order_no = o.order_no
+-- left join dms.contract as c on c.invoice_no = o.invoice_no
+-- left join dms.delivery_order as d on c.invoice_no = d.invoice_no
+-- where ord_detail.state = 1 and c.contract_state in ('4','5')
+-- group by 
+--   o.store_code,
+--   ord_detail.hd_code,
+--   o.customer_code,
+--   o.channel_code,
+--   c.trade_currency,
+--   c.invoice_no,
+--   c.freight_desc,
+--   c.contract_state,
+--   c.hd_order_no
 
-union all
+-- union all
 
 -- 发货单信息
 
@@ -939,15 +1009,21 @@ SELECT
   sum(del_detail.quantity) as del_Shipped_QTY, -- 发货数量
   0 as Shipped_QTY, -- 部分发货数量
   sum(if (d.in_storage_time is null or d.in_storage_time > curdate(), del_detail.quantity, 0)) as Undelivered_Qty,
-  0 as Unreceived_Qty
+  sum(case when dms.custrecord_hp_dms_2b_it_estto is null 
+        then del_detail.quantity
+        else 0 end) as Unreceived_Qty
+-- 无TO单：Unreceived Qty=Undelivered Qty
 FROM 
 dms.delivery_order_detail as del_detail 
 left join dms.delivery_order as d on d.delivery_order_no = del_detail.delivery_order_no
 left join dms.store_info as s on s.ns_store_code=d.ns_store_code
 left join dms.contract as c on c.invoice_no=d.invoice_no
+left join (select distinct custrecord_hp_dms_2b_it_shipnum,custrecord_hp_dms_2b_it_estto from 
+ns.CUSTOMRECORD_HP_DMS_2B_IT) as dms 
+on dms.custrecord_hp_dms_2b_it_shipnum = d.partner_delivery_order_no
 where del_detail.state = 1 
 -- and c.contract_state!=6
-and c.contract_state in ('4','5')
+and c.contract_state in ('3','4','5')
 group by 
   s.store_code,
   del_detail.hd_code,
@@ -966,22 +1042,22 @@ group by
 union all
 
 -- NS-ir单信息
-select 
-  Location,
-  HDcode, 
-  cus_code,
-  channel_id,
-  currency,
+select
+  s.store_code as Location,
+  ir_ord.sku_code as HDcode, 
+  d.customer_code as cus_code,
+  d.channel_code as channel_id,
+  c.trade_currency as currency,
   null as order_no,
   null as order_state,
-  cast(null as timestamp) as order_date,
-  invoice_no,
-  contract_payment_remarks,
-  invoice_state,
-  external_order_no,
-  delivery_order_no,
-  partner_delivery_order_no,
-  transportation_method,
+  cast(null as timestamp) as order_date, 
+  c.invoice_no as invoice_no,
+  c.freight_desc as contract_payment_remarks,
+  c.contract_state as invoice_state,
+  c.hd_order_no as external_order_no,
+  d.delivery_order_no as delivery_order_no,
+  d.partner_delivery_order_no as partner_delivery_order_no,
+  d.transport_type as transportation_method,
   0 as order_QTY, -- 审核中数量
   0 as order_value, -- 审核中商品金额
   0 as contract_price,
@@ -991,80 +1067,35 @@ select
   0 as del_Shipped_QTY, -- 发货数量
   0 as Shipped_QTY, -- 部分发货数量
   0 as Undelivered_Qty, 
-  sum(Shipped_QTY_NS) as Unreceived_Qty
---   sum(if (NS_Receiving_Time is null or NS_Receiving_Time > curdate(), Shipped_QTY_NS, 0)) as Unreceived_Qty
-from (select
-  s.store_code as Location,
-  it.itemid as HDcode, 
-  d.customer_code as cus_code,
-  d.channel_code as channel_id,
-  c.trade_currency as currency,
-  tr.custbody_pm_so_src_no as invoice_no,
-  max(c.created_time) as contract_date,
-  c.freight_desc as contract_payment_remarks,
-  c.contract_state as invoice_state,
-  c.hd_order_no as external_order_no,
-  d.delivery_order_no as delivery_order_no,
-  d.partner_delivery_order_no as partner_delivery_order_no,
-  max(d.delivery_time) as shipping_time,
-  d.transport_type as transportation_method,
-  max(d.etd) as ETD,
-  max(d.eta) as ETA,
-  max(d.atd) as ATD,
-  max(d.ata) as ATA,
-  max(d.in_storage_time) as delivery_time,
-  max(ir.NS_Receiving_Time) as NS_Receiving_Time,
-  sum(trl.quantity) as Shipped_QTY_NS
-from 
-ns.CUSTOMRECORD_HP_DMS_2B_IT as dms -- DMS公司间在途管理记录
-inner join ns.transaction as tr 
-on dms.custrecord_hp_dms_2b_it_estto = tr.id 
+SUM(
+    CASE WHEN dms.custrecord_hp_dms_2b_it_estto IS NOT NULL
+         THEN ir_ord.to_quantity - ir_ord.ir_quantity
+         ELSE 0
+    END
+) AS Unreceived_Qty
+
+from  ns.CUSTOMRECORD_HP_DMS_2B_IT as dms 
+left join dw.dwd_item_receipt_detail as ir_ord 
+on ir_ord.to_id = dms.custrecord_hp_dms_2b_it_estto
 inner join dms.delivery_order as d
 on dms.custrecord_hp_dms_2b_it_shipnum = d.partner_delivery_order_no
-left join ns.transactionLine as trl 
-on  tr.id = trl.transaction and trl.transactionLineType='RECEIVING'
-left join dms.store_info as s on s.ns_store_code=d.ns_store_code
-LEFT JOIN ns.item	as it ON trl.item=it.id
 left join dms.contract as c on c.invoice_no=d.invoice_no
-left join 
-(select 
-  tr.trandate as NS_Receiving_Time,
-  tr.tranid, -- NS IR单号
-  trl.createdfrom -- NS TO单ID
-from ns.transactionline as trl  
-inner join ns.transaction as tr
-on tr.id = trl.transaction 
-where tr.recordtype = 'itemreceipt') as ir
-on ir.createdfrom = tr.id
-where c.contract_state in ('1','2','3','4','5')
+left join dms.store_info as s on s.ns_store_code=d.ns_store_code   
+-- where c.invoice_no='EUDCC312245N02CV'
+where ir_ord.sku_code is not null
 group by 
   s.store_code,
-  it.itemid, 
+  ir_ord.sku_code, 
   d.customer_code,
   d.channel_code,
   c.trade_currency,
-  tr.custbody_pm_so_src_no,
+  c.invoice_no,
   c.freight_desc,
   c.contract_state,
   c.hd_order_no,
   d.delivery_order_no,
   d.partner_delivery_order_no,
   d.transport_type
-  ) as t
-where delivery_order_no='EUDCPMNL5911DF-1'
-group by 
-  Location,
-  HDcode, 
-  cus_code,
-  channel_id,
-  currency,
-  invoice_no,
-  contract_payment_remarks,
-  invoice_state,
-  external_order_no,
-  delivery_order_no,
-  partner_delivery_order_no,
-  transportation_method
 ) as t1
 left join dw.dim_goods as g on g.sku_code = t1.HDcode
 left join dw.dim_customer_subsidiary as cus on cus.cus_code = t1.cus_code
@@ -1072,23 +1103,16 @@ left join dw.dim_customer_channel as channel on channel.channel_id = t1.channel_
 left join sds.ppro_series as ser on ser.code = g.series_code
 left join dms.contract as c on c.invoice_no=t1.invoice_no -- 取合同时间
 left join dms.delivery_order as d on d.delivery_order_no = t1.delivery_order_no -- 取发货单时间
-left join ns.CUSTOMRECORD_HP_DMS_2B_IT as dms  on dms.custrecord_hp_dms_2b_it_shipnum = t1.partner_delivery_order_no
-left join ns.transaction as tr  on dms.custrecord_hp_dms_2b_it_estto = tr.id 
 left join 
-(select 
-  max(tr.trandate) as NS_Receiving_Time,
-  tr.tranid, -- NS IR单号
-  trl.createdfrom -- NS TO单ID
-from ns.transactionline as trl  
-inner join ns.transaction as tr
-on tr.id = trl.transaction 
-where tr.recordtype = 'itemreceipt'
-group by 
-  tr.tranid,
-  trl.createdfrom) as ir
-on ir.createdfrom = tr.id
+(select custrecord_hp_dms_2b_it_shipnum,max(latest_to_date) as latest_to_date
+  from ns.CUSTOMRECORD_HP_DMS_2B_IT as dms 
+  left join dw.dwd_item_receipt_detail as ir_ord 
+  on ir_ord.to_id = dms.custrecord_hp_dms_2b_it_estto
+group by custrecord_hp_dms_2b_it_shipnum) as ir
+on t1.partner_delivery_order_no=ir.custrecord_hp_dms_2b_it_shipnum
+left join dw.dms_customer_channel_info as dms_channel on dms_channel.channel_id = t1.channel_id
 where t1.Location !='USGC线下经销商-USWE'
--- and t1.invoice_no='A39PMUKC5O15DE' and t1.HDcode='1240913115'
+-- and t1.invoice_no='A39PMUKC5O15DE' and t1.HDcode='1240902005'
 and 1=1
 ${if(len(begin_date)=0,""," and g.launch_date >= '"+begin_date+"'")}
 ${if(len(end_date)=0,""," and g.launch_date <= '"+end_date+"'")}
@@ -1118,6 +1142,9 @@ ${if(len(delivery_order_no)=0,""," and t1.delivery_order_no in ('"+replace(deliv
 ${if(len(partner_delivery_order_no)=0,""," and t1.partner_delivery_order_no in ('"+replace(partner_delivery_order_no,"\n","','")+"')")} -- ERP发货单号
 ${if(len(transportation_method)=0,""," and DECODE(t1.transportation_method,'1','SEA','2','AIR','3','LAND','4','TRAIN','5','WEIHAI SEA','6','Express Delivery',t1.transportation_method) in ('"+replace(transportation_method,"\n","','")+"')")} -- 运输方式
 ${if(len(delivery_order_state)=0,""," and DECODE(d.delivery_order_state,'1','Shipped','4','Wait for sailing','5','Sailed','6','Arrived at destination port','7','Customs clearance','8','Delivered',d.delivery_order_state) in ('"+replace(delivery_order_state,"\n","','")+"')")} -- 发货单状态
+${if(len(ch_c1_name)=0,""," and dms_channel.ch_c1_name in ('"+replace(ch_c1_name,"\n","','")+"')")} 
+${if(len(ch_c2_name)=0,""," and dms_channel.ch_c2_name in ('"+replace(ch_c2_name,"\n","','")+"')")} 
+${if(len(ch_c3_name)=0,""," and dms_channel.ch_c3_name in ('"+replace(ch_c3_name,"\n","','")+"')")} 
 group by 
   t1.Location,
   t1.HDcode,
@@ -1136,6 +1163,12 @@ group by
   cus.cus_2nd_cat_name,
   t1.channel_id,
   channel.channel_name_cn,
+  dms_channel.ch_c1_code,
+  dms_channel.ch_c1_name,
+  dms_channel.ch_c2_code,
+  dms_channel.ch_c2_name,
+  dms_channel.ch_c3_code,
+  dms_channel.ch_c3_name,
   channel.cus_country_cn,
   t1.currency,
   t1.order_no,
@@ -1147,4 +1180,6 @@ group by
   t1.delivery_order_no,
   DECODE(d.delivery_order_state,'1','Shipped','4','Wait for sailing','5','Sailed','6','Arrived at port','7','Customs clearance','8','Delivered',d.delivery_order_state),
   t1.partner_delivery_order_no,
-  DECODE(t1.transportation_method,'1','SEA','2','AIR','3','LAND','4','TRAIN','5','WEIHAI SEA','6','Express Delivery',t1.transportation_method)
+  DECODE(t1.transportation_method,'1','SEA','2','AIR','3','LAND','4','TRAIN','5','WEIHAI SEA','6','Express Delivery',t1.transportation_method))
+ WHERE 1=1
+${if(len(Transit_Status)=0,""," AND Transit_Status = '"+Transit_Status+"'")}
