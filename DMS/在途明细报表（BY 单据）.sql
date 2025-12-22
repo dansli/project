@@ -706,6 +706,12 @@ select
   customer_type,
   channel_id,
   channel_name,
+  CH_Class1_code,
+  CH_Class1,
+  CH_Class2_code,
+  CH_Class2,
+  CH_Class3_code,
+  CH_Class3,  
   country,
   currency,
   order_no,
@@ -934,53 +940,6 @@ group by
   c.hd_order_no
 
 union all
-
--- 已发货、已完成状态的合同展示合同信息和发货单信息
-
--- SELECT
---   o.store_code as Location,
---   ord_detail.hd_code as HDcode,
---   o.customer_code as cus_code,
---   o.channel_code as channel_id,
---   c.trade_currency as currency,
---   null as order_no,
---   null as order_state,
---   cast(null as timestamp) as order_date,
---   c.invoice_no as invoice_no,
---   c.freight_desc as contract_payment_remarks,
---   c.contract_state as invoice_state,
---   c.hd_order_no as external_order_no,
---   d.delivery_order_no as delivery_order_no,
---   d.partner_delivery_order_no as partner_delivery_order_no,
---   d.transport_type as transportation_method,
---   0 as order_QTY, -- 审核中数量
---   0 as order_value, -- 审核中商品金额
---   sum(ord_detail.total_price) as contract_price,
---   sum(ord_detail.total_count) as contract_QTY,-- -- 合同未付款、已付款、部分发货数量
---   0 as Orders_QTY_partly_shipped,  -- 部分发货数量
---   0 as del_Shipped_amount,
---   0 as del_Shipped_QTY,
---   0 as Shipped_QTY,
---   0 as Undelivered_Qty,
---   0 as Unreceived_Qty
--- FROM
---   dms.order_detail as ord_detail
--- inner join dms.`order` as o on ord_detail.order_no = o.order_no
--- left join dms.contract as c on c.invoice_no = o.invoice_no
--- left join dms.delivery_order as d on c.invoice_no = d.invoice_no
--- where ord_detail.state = 1 and c.contract_state in ('4','5')
--- group by 
---   o.store_code,
---   ord_detail.hd_code,
---   o.customer_code,
---   o.channel_code,
---   c.trade_currency,
---   c.invoice_no,
---   c.freight_desc,
---   c.contract_state,
---   c.hd_order_no
-
--- union all
 
 -- 发货单信息
 
