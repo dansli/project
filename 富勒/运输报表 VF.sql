@@ -11,7 +11,7 @@ SELECT
   BW.province AS 发货省,
   BW.city AS 发货市,
   BW.district AS 发货区,
-  BW.address1 AS 发货地址,
+  case when B.CUSTOMERID='PPMTSP' AND B.warehouseId='DONGG' THEN BW.address3 ELSE BW.address1 END AS 发货地址,
   B.consigneeId AS 收货人ID,
   B.consigneeName AS 收货人名称,
   B.consigneeProvince AS 收货省,
@@ -40,6 +40,8 @@ SELECT
   CASE WHEN   B.orderType='ROB' THEN A.DROPID ELSE A.pickToTraceId END AS 箱号,
   case when A.uom in ('IP','EA') then 'EA' else A.uom end AS 单位,
   ifnull(A.udf02,'') AS 物流单号,
+--  GROUP_CONCAT(DISTINCT(DS.cartonId))  as  cartonId ,
+  DS.DELIVERYNO  AS 子单号,
   E.订单箱数 AS 订单箱数,--
   '' AS 运输费用,
   '' AS 计划发货,
@@ -53,8 +55,7 @@ SELECT
   '' AS 理赔回款,
   '' AS 是否有延迟,
   '' AS 是否有投诉,
-  A.EDISENDFLAG AS 回传标记 ,
-  GROUP_CONCAT(DISTINCT(DS.cartonId))  as  cartonId ,DS.DELIVERYNO  AS 子单号
+  A.EDISENDFLAG AS 回传标记 
 FROM
   fule.ACT_ALLOCATION_DETAILS A
   LEFT JOIN fule.DOC_ORDER_HEADER B ON A.organizationId = B.organizationId 
@@ -178,7 +179,7 @@ A.DROPID,
   BW.province,
   BW.city,
   BW.district,
-  BW.address1,
+  case when B.CUSTOMERID='PPMTSP' AND B.warehouseId='DONGG' THEN BW.address3 ELSE BW.address1 END,
   A.EDISENDFLAG,
   A.udf07 ,
 ML.UDF03,DS.DELIVERYNO
@@ -194,7 +195,7 @@ SELECT
   BW.province AS 发货省,
   BW.city AS 发货市,
   BW.district AS 发货区,
-  BW.address1 AS 发货地址,
+  case when B.CUSTOMERID='PPMTSP' AND B.warehouseId='DONGG' THEN BW.address3 ELSE BW.address1 END AS 发货地址,
   B.consigneeId AS 收货人ID,
   B.consigneeName AS 收货人名称,
   B.consigneeProvince AS 收货省,
@@ -219,7 +220,9 @@ SELECT
    ML.UDF03 AS 运输时效,
   case when  B.orderType='ROB' THEN A.DROPID ELSE A.pickToTraceId END  AS 箱号,
   case when A.uom in ('IP','EA') then 'EA' else A.uom end AS 单位,
-  (CASE WHEN B.route IN ('SF','SFBKLD') THEN DOD1.mainDeliveryNo ELSE B.deliveryNo END) AS 物流单号,
+  (CASE WHEN B.route IN ('SF','SFBKLD') and DOD1.maindeliveryno is not null THEN DOD1.mainDeliveryNo ELSE B.deliveryNo END) AS 物流单号,
+--  GROUP_CONCAT(DISTINCT(DS.cartonId))  as  cartonId,
+CASE  WHEN DS.DELIVERYNO  = A.pickToTraceId   THEN '' ELSE DS.DELIVERYNO  END     AS 子单号,
   E.订单箱数 AS 订单箱数,
   '' AS 运输费用,
   '' AS 计划发货,
@@ -233,8 +236,7 @@ SELECT
   '' AS 理赔回款,
   '' AS 是否有延迟,
   '' AS 是否有投,
-  B.EDISENDFLAG2 AS 回传标记 ,
-  GROUP_CONCAT(DISTINCT(DS.cartonId))  as  cartonId,CASE  WHEN DS.DELIVERYNO  = A.pickToTraceId   THEN '' ELSE DS.DELIVERYNO  END     AS 子单号
+  B.EDISENDFLAG2 AS 回传标记
 FROM
   fule.ACT_ALLOCATION_DETAILS A
   LEFT JOIN fule.DOC_ORDER_HEADER B ON A.organizationId = B.organizationId 
@@ -332,14 +334,6 @@ ${if(len(deliveryNo)=0,"",
    or
    ((B.route not in ('SF','SFBKLD') or (B.route in ('SF','SFBKLD') and DOD1.maindeliveryno is null)) and B.deliveryNo in ('" + replace(deliveryNo,"\n","','") + "'))
 )")}
-
--- ${if(len(deliveryNo)=0,"",
--- " and (
---    (B.route in ('SF','SFBKLD') and DOD1.mainDeliveryNo in ('" + replace(deliveryNo,"\n","','") + "'))
---    or
---    (B.route not in ('SF','SFBKLD') and B.deliveryNo in ('" + replace(deliveryNo,"\n","','") + "'))
--- )")}
-
 --   AND B.editTime >= DATE_FORMAT( ':TIME1', '%Y-%m-%d' ) 
 --   AND B.editTime <= DATE_FORMAT( ':TIME2', '%Y-%m-%d' ) 
 --   AND B.warehouseId = ':WHID' 
@@ -377,7 +371,7 @@ A.DROPID,
   -- B.orderType,
   -- B.addTime,
   -- B.addWho,
-   (CASE WHEN B.route IN ('SF','SFBKLD') THEN DOD1.mainDeliveryNo ELSE B.deliveryNo END) ,
+   (CASE WHEN B.route IN ('SF','SFBKLD') and DOD1.maindeliveryno is not null THEN DOD1.mainDeliveryNo ELSE B.deliveryNo END) ,
   -- D.Edisendtime,
   E.订单箱数,
   BW.warehouseId,
@@ -385,7 +379,7 @@ A.DROPID,
   BW.province,
   BW.city,
   BW.district,
-  BW.address1,
+  case when B.CUSTOMERID='PPMTSP' AND B.warehouseId='DONGG' THEN BW.address3 ELSE BW.address1 END,
   B.EDISENDFLAG2,
   A.udf07  ,
 ML.UDF03,DS.DELIVERYNO

@@ -1,6 +1,6 @@
 SELECT
 a.warehouseId as 仓库代码,
-a.addWho as 操作人,
+a.addWho as 操作人,   
 a.fmCustomerId as 货主,
 a.toSku as 产品代码,
 b.udf03 as 是否隐藏,
@@ -15,9 +15,10 @@ DATE_FORMAT(t2.putawayDate, '%Y-%m-%d %T') as 上架时间,
 b.skuDescr1 as 产品描述L,
 b.skuDescr2 as 产品描述S,
 b.freightClass as 货类,
+t_cf.freightDescr1 AS 货类描述,
 b.packId as 包装,
 t.packUom as 单位,
-b.sku_group1 as 系列代码,
+b.alternate_sku5 as 系列代码,
 sum(a.toQty_Each) / t.qty as 数量,
 b.sku_group4 as 盒规,
 sum(a.totalCubic) as 体积,
@@ -124,7 +125,11 @@ AND a.organizationId = dod.organizationId
 AND a.warehouseId = dod.warehouseId
 AND a.docno = dod.asnno
 AND a.tosku = dod.sku
-AND A.DOCLINENO = DOD.ASNLINENO
+AND A.DOCLINENO = DOD.ASNLINENO	
+left join fule.BAS_CUSTOMERFREIGHT as t_cf
+on t_cf.organizationId=b.organizationId   
+and  t_cf.customerId=b.customerId  
+and t_cf.freightCode=b.freightClass
 WHERE
 a.transactionType = 'IN'
 AND a.status = '99'
@@ -155,9 +160,10 @@ t2.putawayDate,
 b.skuDescr1,
 b.skuDescr2,
 b.freightClass,
+t_cf.freightDescr1,
 b.packId,
 t.packUom,
-b.sku_group1,
+b.alternate_sku5,
 b.sku_group4,
 b.sku_group3,
 f.udf01,
