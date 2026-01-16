@@ -1,0 +1,26 @@
+<insert id="batchInserTableRoles">
+  REPLACE INTO dw.dim_manual_robo_sku_mapping
+  (
+    sku_short_name,
+    sku_barcode,
+    sku_rank,
+    active_date,
+    category,
+    update_date,
+    is_priority,
+is_unrestricted,
+is_transfer
+  )
+  <foreach collection="result" item="r" separator=" UNION ALL ">
+    SELECT
+      #{r.sku_short_name},
+      #{r.sku_barcode},
+      #{r.sku_rank},
+      DATE_ADD('1899-12-30', #{r.active_date}),
+      #{r.category},
+      CURDATE(),
+          #{r.is_priority},
+      #{r.is_unrestricted},
+      #{r.is_transfer}
+  </foreach>
+</insert>
