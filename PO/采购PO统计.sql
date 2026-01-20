@@ -942,17 +942,17 @@ distinct
     po.purchase_price_other as 产品单价非盲售,
     po.currency_code as 币种,
     po.exchangerate as 汇率,
-    po.purchase_cnt_box/po.box_spec as 付费数量套,
+    nvl(po.purchase_cnt_box,0) as 付费数量套,
     po.purchase_cnt as 付费数量个,
-    po.purchase_cnt/po.box_spec as 盲盒大货数量套,
+    nvl(po.purchase_cnt_blind_bulk_box,0) as 盲盒大货数量套,
     po.purchase_cnt_blind_bulk as 盲盒大货数量个,
-    po.purchase_cnt_clear_bulk/po.box_spec as 明盒大货数量套,
+    nvl(po.purchase_cnt_clear_bulk_box,0) as 明盒大货数量套,
     po.purchase_cnt_clear_bulk as 明盒大货数量个,
     po.purchase_cnt_bulk as 系列大货数量个,
-    po.purchase_cnt_retained_box/po.box_spec as 系列留货数量套,
+    nvl(po.purchase_cnt_retained_box,0) as 系列留货数量套,
     po.purchase_cnt_retained as 系列留货数量个,
     po.purchase_cnt_clear_retained as 明盒留货数量个,
-    po.purchase_cnt_display_box/po.box_spec as 系列陈列数量套,
+    nvl(po.purchase_cnt_display_box,0) as 系列陈列数量套,
     po.purchase_cnt_display as 系列陈列数量个,
     po.purchase_cnt_pay_spare as 付费备品数量个,
     po.purchase_cnt_free_spare as 免费备品数量个,
@@ -1006,3 +1006,185 @@ ${if(len(pro_type)=0,""," and g.pro_type in ('"+replace(pro_type,"\n","','")+"')
 ${if(len(ip_name)=0,""," and g.ip_name in ('"+replace(ip_name,"\n","','")+"')")} -- IP
 ${if(len(po_code)=0,""," and po.po_code in ('"+replace(po_code,"\n","','")+"')")} -- PO单
 order by po.po_create_time,po.po_code,po.sku_code,po.spu_code desc
+
+
+
+
+
+select 
+distinct 
+    sub.name as 采购主体,  
+    g.pro_cat_name1 as 商品一级分类,
+    g.pro_cat_name2 as 商品二级分类,
+    g.pro_cat_name3 as 商品三级分类,
+    g.pro_type as 产品线,
+    g.department_full_name as 产品部门,
+    g.ip_name as IP名称,
+    g.series_name as 系列名称,
+    g.main_series_code as 主系列编码,
+    po.spu_code as 系列编码,
+    po.sku_code as 商品编码,
+    case when po.po_type='SPU' then null else g.sku_name end as 商品名称,
+    po.box_spec as 盒规,
+    g.launch_date as 上市日期,
+    po.retail_price as 零售价,
+    po.supplier_name as 供应商名称,
+    po.po_code as PO单号,
+    po.po_type as PO单据类型,
+    po.purchaser_name as 采购员,
+    po.production_mode_cn as 生产模式,
+    po.pr_create_time as PR创建时间,
+    po.po_create_time as PO创建时间,
+    po.po_create_year as 下PO年份,
+    po.first_sl_create_time as 首批交付日期,
+    po.po_confirm_time as  确认货期日期,
+    po.first_bulk_days as 首批大货生产周期,
+    po.last_sl_create_time as 交付完成日期,
+    po.last_bulk_days as 系列生产总周期,
+    po.po_num as 订单序号,
+    round(po.purchase_price_blind,2) as 产品单价盲盒,
+    round(po.purchase_price_clear,2) as 产品单价明盒,
+    -- po.price_diff as 明盲盒差价,
+    po.purchase_price_other as 产品单价非盲售,
+    po.currency_code as 币种,
+    po.exchangerate as 汇率,
+    -- nvl(po.purchase_cnt_box,0) as 付费数量套,
+    po.purchase_cnt as 付费数量个,
+    -- nvl(po.purchase_cnt_blind_bulk_box,0) as 盲盒大货数量套,
+    po.purchase_cnt_blind_bulk as 盲盒大货数量个,
+    -- nvl(po.purchase_cnt_clear_bulk_box,0) as 明盒大货数量套,
+    po.purchase_cnt_clear_bulk as 明盒大货数量个,
+    po.purchase_cnt_bulk as 系列大货数量个,
+    -- nvl(po.purchase_cnt_retained_box,0) as 系列留货数量套,
+    po.purchase_cnt_retained as 系列留货数量个,
+    po.purchase_cnt_clear_retained as 明盒留货数量个,
+    -- nvl(po.purchase_cnt_display_box,0) as 系列陈列数量套,
+    po.purchase_cnt_display as 系列陈列数量个,
+    po.purchase_cnt_pay_spare as 付费备品数量个,
+    po.purchase_cnt_free_spare as 免费备品数量个,
+    po.purchase_cnt_blind_pay_spare as 付费备品盲盒数量个,
+    po.purchase_cnt_blind_free_spare as 免费备品盲盒数量个,
+    po.po_order_amount as PO单金额,
+    po_order_amount_cny as PO单金额CNY,
+    -- po.purchase_amount as PO产品金额,
+    -- purchase_amount_cny as PO产品金额CNY,
+    nvl(po.major_po_order_amount,'-') as 一品多厂PO总金额,
+    case when po.purchase_price_blind is not null 
+    and po.purchase_price_clear is not null 
+    then round(ABS(po.purchase_price_blind-po.purchase_price_clear),3)
+    else '-' end as 明盲盒差价PCS,
+    case when po.purchase_price_blind is not null 
+    and po.purchase_price_clear is not null 
+    then round(po.purchase_cnt_clear,0) else '-' end as 明盒数量个,
+    case when po.purchase_price_blind is not null 
+    and po.purchase_price_clear is not null 
+    then abs(po.purchase_price_blind*(po.purchase_cnt_blind_bulk+po.purchase_cnt_retained-
+    po.purchase_cnt_clear_retained+po.purchase_cnt_blind_pay_spare)-
+    po.purchase_price_clear*(po.purchase_cnt_clear_bulk+po.purchase_cnt_clear_retained+
+    po.purchase_cnt_display+po.purchase_cnt_pay_spare-po.purchase_cnt_blind_free_spare)) 
+    else '-' end as PO产品明盲盒差价,
+    -- po.gross_profit as 盲盒毛利,
+    case when po.retail_price!=0 then po.gross_margin else '-' end as 吊牌毛利
+from dw.ads_po_detail as po
+LEFT JOIN dw.dim_goods as g
+  ON (
+       (po.po_type = 'SKU' AND g.sku_code = po.sku_code)
+       OR
+       (po.po_type ='SPU' AND g.series_code = po.spu_code)
+     ) and g.packaging_form !='模具'
+left join po.base_purchase_subject_info as sub
+on sub.id=po.purchase_subject_id
+where 1=1
+${if(len(name)=0,""," and sub.name in ('"+replace(name,"\n","','")+"')")} -- 采购主体
+${if(len(supplier_name)=0,""," and po.supplier_name in ('"+replace(supplier_name,"\n","','")+"')")} -- 供应商名称
+${if(len(series_name)=0,""," and g.series_name in ('"+replace(series_name,"\n","','")+"')")} -- 系列名称
+${if(len(main_series_code)=0,""," and g.main_series_code in ('"+replace(main_series_code,"\n","','")+"')")} -- 主系列编码
+${if(len(spu_code)=0,""," and spu_code in ('"+replace(spu_code,"\n","','")+"')")} -- 系列编码
+${if(len(sku_code)=0,""," and po.sku_code in ('"+replace(sku_code,"\n","','")+"')")} -- 商品编码
+${if(len(sku_name)=0,""," and g.sku_name in ('"+replace(sku_name,"\n","','")+"')")} -- 商品名称
+${if(len(purchaser_name)=0,""," and po.purchaser_name in ('"+replace(purchaser_name,"\n","','")+"')")} -- PO单采购员
+${if(len(pro_cat_name1)=0,""," and g.pro_cat_name1 in ('"+replace(pro_cat_name1,"\n","','")+"')")} -- 商品一级分类
+${if(len(pro_cat_name2)=0,""," and g.pro_cat_name2 in ('"+replace(pro_cat_name2,"\n","','")+"')")} -- 商品二级分类
+${if(len(pro_cat_name3)=0,""," and g.pro_cat_name3 in ('"+replace(pro_cat_name3,"\n","','")+"')")} -- 商品三级分类
+${if(len(start)=0,""," and po.po_create_time >= '"+start+"'")}
+${if(len(end)=0,""," and po.po_create_time <= '"+end+"'")}
+${if(len(pro_type)=0,""," and g.pro_type in ('"+replace(pro_type,"\n","','")+"')")} -- 产品线
+${if(len(ip_name)=0,""," and g.ip_name in ('"+replace(ip_name,"\n","','")+"')")} -- IP
+${if(len(po_code)=0,""," and po.po_code in ('"+replace(po_code,"\n","','")+"')")} -- PO单
+order by po.po_create_time,po.po_code,po.sku_code,po.spu_code desc
+
+union 
+
+select 
+purchase_subject as 采购主体,
+pro_cat_name1 as 商品一级分类,
+pro_cat_name2 as 商品二级分类,
+pro_cat_name3 as 商品三级分类,
+pro_type as 产品线,
+department_full_name as 产品部门,
+ip_name as IP名称,
+series_name as 系列名称,
+main_series_code as 主系列编码,
+spu_code as 系列编码,
+sku_code as 商品编码,
+sku_name as 商品名称,
+box_spec as 盒规,
+launch_date as 上市日期,
+retail_price as 零售价,
+supplier_name as 供应商名称,
+po_code as PO单号,
+po_type as PO单据类型,
+purchaser_name as 采购员,
+production_mode_cn as 生产模式,
+pr_create_time as PR创建时间,
+po_create_time as PO创建时间,
+po_create_year as 下PO年份,
+first_sl_create_time as 首批交付日期,
+po_confirm_time as 确认货期日期,
+first_bulk_days as 首批大货生产周期,
+last_sl_create_time as 交付完成日期,
+last_bulk_days as 系列生产总周期,
+po_num as 订单序号,
+purchase_price_blind as 产品单价盲盒,
+purchase_price_clear as 产品单价明盒,
+purchase_price_other as  产品单价非盲售,
+currency_code as 币种,
+exchangerate as 汇率,
+purchase_cnt as 付费数量个,
+purchase_cnt_blind_bulk as 盲盒大货数量个,
+purchase_cnt_clear_bulk as 明盒大货数量个,
+purchase_cnt_bulk as 系列大货数量个,
+purchase_cnt_retained as 系列留货数量个,
+purchase_cnt_clear_retained as 明盒留货数量个,
+purchase_cnt_display as 系列陈列数量个,
+purchase_cnt_pay_spare as 付费备品数量个,
+purchase_cnt_free_spare as 免费备品数量个,
+purchase_cnt_blind_pay_spare as 盲盒付费备品数量个,
+purchase_cnt_blind_free_spare as 盲盒免费备品数量个,
+po_order_amount as PO单总金额,
+po_order_amount_cny as PO单总金额CNY,
+-- purchase_amount as PO产品总金额,
+major_po_order_amount as 一品多厂PO总金额,
+price_diff_pcs as 明盲盒差价PCS,
+purchase_cnt_clear as 明盒数量个,
+price_diff as 明盲盒差价,
+nvl(gross_margin,'-') as 吊牌毛利
+from dw.po_detail_manual
+where 1=1
+${if(len(name)=0,""," and purchase_subject in ('"+replace(name,"\n","','")+"')")} -- 采购主体
+${if(len(supplier_name)=0,""," and supplier_name in ('"+replace(supplier_name,"\n","','")+"')")} -- 供应商名称
+${if(len(series_name)=0,""," and series_name in ('"+replace(series_name,"\n","','")+"')")} -- 系列名称
+${if(len(main_series_code)=0,""," and main_series_code in ('"+replace(main_series_code,"\n","','")+"')")} -- 主系列编码
+${if(len(spu_code)=0,""," and spu_code in ('"+replace(spu_code,"\n","','")+"')")} -- 系列编码
+${if(len(sku_code)=0,""," and sku_code in ('"+replace(sku_code,"\n","','")+"')")} -- 商品编码
+${if(len(sku_name)=0,""," and sku_name in ('"+replace(sku_name,"\n","','")+"')")} -- 商品名称
+${if(len(purchaser_name)=0,""," and purchaser_name in ('"+replace(purchaser_name,"\n","','")+"')")} -- PO单采购员
+${if(len(pro_cat_name1)=0,""," and pro_cat_name1 in ('"+replace(pro_cat_name1,"\n","','")+"')")} -- 商品一级分类
+${if(len(pro_cat_name2)=0,""," and pro_cat_name2 in ('"+replace(pro_cat_name2,"\n","','")+"')")} -- 商品二级分类
+${if(len(pro_cat_name3)=0,""," and pro_cat_name3 in ('"+replace(pro_cat_name3,"\n","','")+"')")} -- 商品三级分类
+${if(len(start)=0,""," and po_create_time >= '"+start+"'")}
+${if(len(end)=0,""," and po_create_time <= '"+end+"'")}
+${if(len(pro_type)=0,""," and pro_type in ('"+replace(pro_type,"\n","','")+"')")} -- 产品线
+${if(len(ip_name)=0,""," and ip_name in ('"+replace(ip_name,"\n","','")+"')")} -- IP
+${if(len(po_code)=0,""," and po_code in ('"+replace(po_code,"\n","','")+"')")} -- PO单
+order by po_create_time,po_code,sku_code,spu_code desc
